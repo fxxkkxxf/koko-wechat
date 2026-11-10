@@ -1,0 +1,1 @@
+{"name":"koko-wechat","version":"0.7.3","private":true,"type":"module","scripts":{"start":"node server.mjs --ensure --open","serve":"node server.mjs --serve","test":"node --test tests/*.test.mjs"},"engines":{"node":">=22"},"license":"MIT"}

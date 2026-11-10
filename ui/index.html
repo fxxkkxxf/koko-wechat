@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#7452c8">
+  <title>可可 · 微信小屋</title>
+  <link rel="icon" type="image/png" href="/assets/koko-app.png">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="可可微信版首页"><img src="/assets/koko-app.png" alt="" width="44" height="44"><span>可可<span class="brand-sub">微信小屋</span></span></a>
+    <div class="top-meta"><span class="connection" id="pageConnection"><i></i>连接管理页中</span><span class="version" id="version">v0.1</span></div>
+  </header>
+  <main class="shell">
+    <section class="hero" aria-labelledby="heroTitle">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="tiny-star">✦</span> KOKO · WECHAT</div>
+        <h1 id="heroTitle">消息来了，可可接住。</h1>
+        <p class="hero-description">在微信里继续聊天，留住你们的上下文。<br class="desktop-break">文字可以在后台发，让你继续做自己的事。</p>
+        <div class="hero-controls"><button class="button primary" id="autoToggle" disabled><span class="button-dot"></span><span id="autoToggleLabel">开启自动回复</span></button><button class="button light" id="takeOver" disabled>暂停 · 我来聊</button><span class="mode-pill" id="autoStatus">正在读取状态</span></div>
+        <p class="hero-hint" id="autoHint">先检测连接，再绑定你的小号和聊天对象。</p>
+      </div>
+      <div class="hero-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><span class="art-spark spark-one">✦</span><span class="art-spark spark-two">✧</span><img src="/assets/koko-app.png" alt="" width="260" height="260"><span class="art-caption">你的白发小龙娘</span></div>
+    </section>
+
+    <div class="notice error hidden" id="globalError" role="alert"></div>
+    <div class="notice success hidden" id="globalNotice" role="status"></div>
+
+    <section class="status-grid" aria-label="连接状态">
+      <article class="status-card"><div class="status-symbol">微</div><div><p class="status-caption">微信桥接</p><strong id="bridgeStatus">等待检测</strong><p class="status-detail" id="bridgeDetail">小号需要在电脑微信中登录</p></div><span class="status-light" id="bridgeLight"></span></article>
+      <article class="status-card"><div class="status-symbol code-symbol">⌘</div><div><p class="status-caption">Codex</p><strong id="codexStatus">等待检测</strong><p class="status-detail" id="codexDetail">使用本机已登录的账号</p></div><span class="status-light" id="codexLight"></span></article>
+      <article class="status-card"><div class="status-symbol">↗</div><div><p class="status-caption">当前聊天对象</p><strong id="targetStatus">尚未绑定</strong><p class="status-detail" id="targetDetail">先从联系人中选择</p></div><span class="status-light" id="targetLight"></span></article>
+    </section>
+
+    <section class="model-bar" aria-labelledby="modelTitle">
+      <div class="model-bar-title"><span class="model-mark" aria-hidden="true">✧</span><div><label for="modelSelect" id="modelTitle">可可使用的模型</label><p id="modelCurrent">正在读取当前模型</p></div></div>
+      <div class="model-bar-controls"><select id="modelSelect" disabled><option value="">正在检测可用模型…</option></select><button class="button secondary small" id="saveModel" disabled>切换模型</button><button class="icon-button" id="loadModels" title="刷新可用模型" aria-label="刷新可用模型">↻</button></div>
+      <p class="model-note" id="modelNote">切换模型会暂停自动回复，保存后可重新开启。</p>
+    </section>
+
+    <section class="model-bar" aria-labelledby="sendModeTitle">
+      <div class="model-bar-title"><span class="model-mark" aria-hidden="true">↗</span><div><label for="textSendMode" id="sendModeTitle">微信文字怎么发</label><p id="sendModeStatus">正在读取发送设置</p></div></div>
+      <div class="model-bar-controls"><select id="textSendMode" aria-label="文字发送方式"><option value="background">后台发送 · 不抢窗口</option><option value="foreground">前台兼容 · 发完恢复</option></select><select id="textEncoding" aria-label="后台文字编码"><option value="auto">自动检测编码</option><option value="utf16">UTF-16</option><option value="gbk">GBK · 旧版微信</option></select><button class="button secondary small" id="saveSendMode" disabled>保存发送方式</button></div>
+      <p class="model-note" id="sendModeHint">微信可最小化：回复时临时还原到其他窗口后面，完成后重新最小化。多行文字请选前台兼容；找不到会话时先在微信打开一次。</p>
+    </section>
+
+    <div class="content-grid">
+      <div class="main-column">
+        <section class="panel participants-panel" aria-labelledby="participantsTitle">
+          <div class="panel-heading"><div><div class="section-kicker">让可可参与哪里</div><h2 id="participantsTitle">参与会话</h2></div><span class="subtle-chip" id="participantsSavedCount">0 个参与</span></div>
+          <p class="section-description">统一选择联系人和群聊。只读取通讯录名称，不会读取未勾选会话的聊天内容；原有群聊接话规则继续保留。</p>
+          <div class="participants-toolbar"><button class="button outline small" id="loadDirectory" type="button">加载群聊与联系人</button><span class="field-help" id="directoryStatus">尚未加载通讯录</span></div>
+          <div class="participants-filters"><label class="sr-only" for="participantsQuery">搜索群聊或联系人</label><input id="participantsQuery" type="search" maxlength="160" placeholder="搜索名称、备注或微信 ID" autocomplete="off"><label class="sr-only" for="participantsType">会话类型</label><select id="participantsType"><option value="all">全部类型</option><option value="group">只看群聊</option><option value="private">只看私聊</option><option value="selected">只看已选</option></select></div>
+          <div class="participants-selection"><span id="participantsCount">已选 0 个</span><span class="participants-bulk"><button class="text-button" id="selectFiltered" type="button">选中当前筛选</button><button class="text-button" id="clearFiltered" type="button">取消当前筛选</button></span></div>
+          <div class="participants-list" id="participantsList" role="group" aria-label="参与会话选择"></div>
+          <p class="field-help" id="participantsEmpty">加载通讯录后，可搜索并批量勾选。</p><button class="text-button hidden" id="showMoreParticipants" type="button">显示更多</button>
+          <div class="participants-apply"><div><strong id="participantsDraftHint">当前选择已保存</strong><p class="field-help">新选择点击应用后生效；全部取消会暂停自动回复。</p></div><div class="participants-apply-buttons"><button class="text-button" id="resetParticipants" type="button">撤销修改</button><button class="button secondary small" id="saveParticipants" type="button" disabled>应用选择</button></div></div>
+        </section>
+        <section class="panel test-panel" aria-labelledby="testTitle">
+          <div class="panel-heading"><div><div class="section-kicker">先试一句</div><h2 id="testTitle">和可可试聊</h2></div><span class="subtle-chip">仅本地</span></div>
+          <p class="section-description">先确认人设和模型能正常回复，这里的消息不会发送到微信。</p>
+          <div class="chat-feed" id="chatFeed" aria-live="polite" aria-relevant="additions text">
+            <div class="chat-empty" id="chatEmpty"><div class="empty-icon">“</div><strong>先打个招呼吧</strong><p>可可的回复会出现在这里。</p></div>
+          </div>
+          <form id="testForm" class="chat-composer">
+            <label class="sr-only" for="testMessage">试聊消息</label><textarea id="testMessage" rows="2" maxlength="4000" placeholder="今天想和可可聊什么？" required></textarea>
+            <div class="composer-bottom"><span id="testHint">Enter 发送 · Shift + Enter 换行</span><button type="submit" class="button primary small" id="testSend">发送 <span aria-hidden="true">↗</span></button></div>
+          </form>
+        </section>
+
+        <section class="panel activity-panel" aria-labelledby="activityTitle">
+          <div class="panel-heading"><div><div class="section-kicker">正在发生</div><h2 id="activityTitle">最近互动</h2></div><span class="subtle-chip" id="activityCount">0 条记录</span></div>
+          <div class="current-task hidden" id="currentTask"><span class="spinner"></span><div class="current-task-body"><strong id="currentTitle">正在处理消息</strong><p id="currentDetail"></p><div id="currentMessages" class="message-pair"></div></div></div>
+          <div id="routeRecovery" class="delivery-review hidden" aria-live="polite"><div class="delivery-review-heading"><strong>会话运行状态</strong></div><p>会话开关保留你的选择。临时问题会暂避后处理新来信；旧回复不会自动重发。</p><div id="routeRecoveryList"></div></div>
+          <div id="deliveryReview" class="delivery-review hidden" aria-live="polite"><div class="delivery-review-heading"><strong>有发送记录需要核对</strong><span id="deliveryReviewCount"></span></div><p>先在微信里查看下面的消息是否已经发送。点「已核对」只跳过旧消息，不会重发；自动回复开关和参与群聊仍按当前设置。</p><div id="deliveryReviewList"></div></div>
+          <p class="activity-intro">每条回复对应的来信、聊天对象和发送结果都会一起显示。</p>
+          <div class="activity-empty" id="activityEmpty">收到新消息后，这里会展示原消息和可可的回复。</div>
+          <ol class="timeline" id="eventList"></ol>
+        </section>
+      </div>
+
+      <aside class="side-column">
+        <section class="panel connect-panel" aria-labelledby="connectTitle">
+          <div class="panel-heading"><div><div class="section-kicker">第一次见面</div><h2 id="connectTitle">接上你的微信</h2></div><span class="step-number">01</span></div>
+          <p class="section-description" id="connectionIntro">先登录电脑微信，再让可可认准小号和聊天对象。</p>
+          <button class="button outline full" id="diagnose">检测连接 <span aria-hidden="true">↻</span></button>
+          <div class="field"><div class="field-label-row"><label for="accountSelect">微信小号</label><button class="text-button" id="loadAccounts" type="button">刷新账号</button></div><select id="accountSelect"><option value="">检测后选择账号</option></select><p class="field-help" id="accountHelp">选择你已登录的小号</p></div>
+          <div class="field"><div class="field-label-row"><label for="contactQuery">联系人昵称、备注或微信 ID</label></div><div class="contact-search"><input id="contactQuery" maxlength="160" autocomplete="off" placeholder="输入联系人昵称或备注"><button class="button secondary small" id="loadContacts" type="button" disabled>查找</button></div></div>
+          <div class="field"><div class="field-label-row"><label for="contactSelect">首次绑定的私聊</label></div><select id="contactSelect" disabled><option value="">查找后选择联系人</option></select><p class="field-help" id="contactHelp">绑定后可在「参与会话」中调整回复范围。</p></div>
+          <button class="button secondary full" id="bind" disabled>保存账号与默认私聊</button>
+          <p class="binding-note" id="bindingNote">绑定后，自动回复仍由顶部开关控制。</p>
+          <div class="diagnostic hidden" id="diagnostic" role="status"></div>
+        </section>
+
+        <details class="panel fold-panel group-panel" id="groupPanel" open>
+          <summary><span><span class="fold-icon">♧</span>群聊与主动搭话<span class="counter" id="groupCount">0</span></span><span class="chevron">⌄</span></summary>
+          <div class="fold-content">
+            <p class="section-description">批量选择请使用「参与会话」。在这里单独调整每个群的接话方式。</p>
+            <div class="field group-query-field"><div class="field-label-row"><label for="groupQuery">查找群聊</label></div><div class="contact-search"><input id="groupQuery" maxlength="160" autocomplete="off" placeholder="输入群名或群 ID"><button class="button secondary small" id="loadGroups" type="button" disabled>查找</button></div></div>
+            <div class="field"><div class="field-label-row"><label for="groupSelect">选择群聊</label></div><select id="groupSelect" disabled><option value="">查找后选择群聊</option></select></div>
+            <div class="field"><div class="field-label-row"><label for="groupMode">什么时候接话</label></div><select id="groupMode"><option value="mention">只在被 @ 时接话</option><option value="addressed" selected>被 @、叫名字或接着聊</option><option value="smart">主动搭话 · 有合适话题才加入</option></select><p class="field-help" id="groupModeHelp">被 @ 或叫到名字时接话，窗口内同一位群友可以继续聊。</p></div>
+            <div id="groupProactiveOptions" class="hidden"><div class="group-number-fields"><div class="field"><label for="groupProactiveInterval">主动搭话至少间隔</label><div class="number-unit"><input id="groupProactiveInterval" type="number" min="30" max="3600" step="1" value="120"><span>秒</span></div></div><div class="field"><label for="groupProactiveMax">每小时主动搭话上限</label><div class="number-unit"><input id="groupProactiveMax" type="number" min="1" max="20" step="1" value="3"><span>次</span></div></div></div><p class="field-help">按整轮回复计数，分成几条短句也只算一次。发送结果不明也占一次，避免重复搭话。被 @、叫名字和正在接续的对话另按普通回复处理。</p></div>
+            <div class="field"><div class="field-label-row"><label for="groupAliases">群里的称呼</label></div><input class="group-input" id="groupAliases" maxlength="300" autocomplete="off" placeholder="用逗号分隔；留空使用默认称呼"><p class="field-help">留空时使用小号昵称和「可可」。</p></div>
+            <div class="group-number-fields"><div class="field"><label for="groupCooldown">回复冷却</label><div class="number-unit"><input id="groupCooldown" type="number" min="3" max="120" step="1" value="8"><span>秒</span></div></div><div class="field"><label for="groupFollowup">接话窗口</label><div class="number-unit"><input id="groupFollowup" type="number" min="15" max="600" step="1" value="90"><span>秒</span></div></div></div>
+            <div class="group-save-row"><span class="save-hint" id="groupDraftHint">选择群聊后添加</span><button class="text-button" id="clearGroupDraft" type="button">清空选择</button></div>
+            <button class="button secondary full" id="saveGroup" type="button" disabled>添加这个群</button>
+            <div class="group-list-heading"><span>已接入的群</span><span class="field-help" id="groupEnabledCount">0 个开启</span></div>
+            <div class="group-list" id="groupList"></div><p class="field-help group-empty" id="groupEmpty">还没有接入群聊。</p>
+            <p class="group-privacy-note">主动搭话只在本群有新消息时判断；没人聊天时不会自行开话题，也不会主动私聊。群开关与顶部自动回复总开关共同生效。群聊与私聊的设定、记忆分别保存。</p>
+            <details class="group-persona-fold" id="groupPersonaPanel"><summary>群聊里的可可 <span class="chevron">⌄</span></summary><p class="field-help">这是群聊公开使用的角色设定，和私聊里的可可分别保存。</p><label class="sr-only" for="groupPersona">群聊公开角色设定</label><textarea class="persona-input" id="groupPersona" rows="6" maxlength="20000" placeholder="写下可可在群聊里的说话方式…"></textarea><div class="fold-actions"><span class="save-hint" id="groupPersonaHint">尚未修改</span><button class="button secondary small" id="saveGroupPersona" type="button">保存群聊设定</button></div></details>
+          </div>
+        </details>
+
+        <details class="panel fold-panel" id="ownerPanel">
+          <summary><span><span class="fold-icon">♡</span>认准主人</span><span class="chevron">⌄</span></summary>
+          <div class="fold-content">
+            <p class="section-description">按真实微信账号认人，群昵称相同也不会冒认。这里调整称呼和相处方式，参与会话的名单另行管理。</p>
+            <label class="search-setting"><input id="ownerEnabled" type="checkbox"><span>认准这位主人</span></label>
+            <div class="field"><div class="field-label-row"><label for="ownerSelect">主人的微信账号</label><button class="text-button" id="loadOwnerContacts" type="button">加载联系人</button></div><select id="ownerSelect"><option value="">先加载联系人后选择</option></select><p class="field-help" id="ownerAccountHint">只从当前小号的好友中选择，不按群昵称判断。</p></div>
+            <div class="field"><label for="ownerName">显示名</label><input class="group-input" id="ownerName" maxlength="60" autocomplete="off" placeholder="主人的名字或备注"></div>
+            <div class="field"><label for="ownerTitle">平时怎么称呼</label><input class="group-input" id="ownerTitle" maxlength="20" autocomplete="off" placeholder="主人" value="主人"></div>
+            <p class="field-help" id="ownerStatus">尚未设置主人。</p><p class="field-help">群里会区分主人和其他群友，也会继续保护私聊信息；主人称呼不会增加电脑操作权限。</p>
+            <div class="fold-actions"><span class="save-hint" id="ownerHint">尚未修改</span><button class="button secondary small" id="saveOwner" type="button" disabled>保存主人设定</button></div>
+          </div>
+        </details>
+
+        <details class="panel fold-panel" id="personaPanel"><summary><span><span class="fold-icon">✧</span>可可的人设</span><span class="chevron">⌄</span></summary><div class="fold-content"><p class="section-description">让她按你喜欢的方式说话。保存后用于之后的回复。</p><label class="sr-only" for="persona">人设提示词</label><textarea class="persona-input" id="persona" rows="9" maxlength="20000" placeholder="写下可可的性格、说话习惯和相处方式…"></textarea><div class="fold-actions"><span class="save-hint" id="personaHint">尚未修改</span><button class="button secondary small" id="savePersona">保存人设</button></div></div></details>
+
+        <details class="panel fold-panel" id="memoryPanel"><summary><span><span class="fold-icon">◇</span>她记住的事<span class="counter" id="memoryCount">0</span></span><span class="chevron">⌄</span></summary><div class="fold-content"><p class="section-description">最近原话、滚动摘要和长期事实分开保存。每个私聊、每个群分别管理。</p><label class="field-label" for="memoryScope">查看哪段会话</label><select id="memoryScope"><option value="all">全部会话</option></select><p class="field-help" id="memoryStats">正在读取记忆状态</p><div class="memory-section-label">长期记忆 <span id="filteredMemoryCount">0</span></div><ul class="memory-list" id="memoryList"></ul><p class="field-help" id="memoryEmpty">这段会话还没有保存的记忆。</p><div class="memory-section-label">滚动摘要 <span id="summaryCount">0</span></div><div class="summary-list" id="summaryList"></div><p class="field-help" id="summaryEmpty">长对话整理后会在这里显示摘要。</p><p class="field-help">摘要用于接续话题，可能省略细节；需要原话时请核对聊天记录。</p><div class="memory-actions"><button class="text-button" id="compressContext" disabled>整理这段上下文</button><button class="text-button danger" id="clearMemory" disabled>清空所选会话记忆</button></div><p class="field-help">清空后会同时忘记所选范围的长期记忆和摘要，不会删除微信消息。</p></div></details>
+
+        <details class="panel fold-panel" id="searchPanel"><summary><span><span class="fold-icon">⌕</span>联网查资料</span><span class="chevron">⌄</span></summary><div class="fold-content"><label class="search-setting"><input id="webSearchEnabled" type="checkbox"><span>需要实时资料时允许联网查询</span></label><p class="field-help">普通闲聊不搜索。查询使用独立关键词，不携带整段聊天历史或记忆；联网查询会增加等待时间。</p><div class="fold-actions"><span class="save-hint" id="searchSettingHint">尚未修改</span><button class="button secondary small" id="saveSearchSetting" type="button">保存设置</button></div><label class="field-label" for="searchQuery">试查资料</label><div class="contact-search search-test"><input id="searchQuery" maxlength="200" placeholder="输入要查询的问题" autocomplete="off"><button class="button secondary small" id="testSearch" type="button" disabled>试查</button></div><p class="field-help">仅在这里显示结果，不发送到微信。</p><p class="field-help" id="searchStatus">尚未查询</p><div class="search-result hidden" id="searchResult"><p id="searchAnswer"></p><ul id="searchSources"></ul></div></div></details>
+
+        <div class="quiet-note"><span aria-hidden="true">◌</span><p>微信和本地后台需要保持运行。管理页关掉后，已开启的自动回复仍会继续。</p></div>
+      </aside>
+    </div>
+    <footer class="footer"><span>可可 · Codex 微信版</span><span>把日常聊成一点点熟悉。</span></footer>
+  </main>
+</body>
+</html>
