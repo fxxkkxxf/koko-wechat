@@ -360,8 +360,8 @@
       const label=document.createElement('p');label.className='delivery-review-meta';label.textContent=firstText(row.chatName,'会话')+' · '+recoveryText(row);
       const reason=document.createElement('p');reason.className='field-help';reason.textContent=safeDiagnostic(row.reason);card.append(label,reason);
       if(row.kind!=='waiting'){
-        const button=document.createElement('button');button.className='button secondary small';button.type='button';button.dataset.recoveryResume=row.chatId;button.textContent=row.kind==='review'?'已核对，继续接收新消息':'修复后继续接收新消息';button.disabled=pending.has('recovery:'+row.chatId);
-        button.addEventListener('click',()=>task('recovery:'+row.chatId,button,async()=>{await action('recovery-resume',{chatId:row.chatId});await refresh(true);notice('已继续接收新消息，旧回复不会重发；会话开关保持原样。');}));card.append(button);
+        const button=document.createElement('button');button.className='button secondary small';button.type='button';button.dataset.recoveryResume=row.chatId;button.textContent=row.kind==='review'?'已核对，重新连接':'重新连接并继续接收';button.disabled=pending.has('recovery:'+row.chatId);
+        button.addEventListener('click',()=>task('recovery:'+row.chatId,button,async()=>{const result=await action('recovery-resume',{chatId:row.chatId});await refresh(true);notice(result.resumed?'已重新连接，只接收新消息，旧回复不会重发。':'连接已核验，自动回复保持暂停；开启后接收新消息。');}));card.append(button);
       }
       list.append(card);
     }

@@ -21,7 +21,7 @@ const root=path.dirname(fileURLToPath(import.meta.url));
 const runtime=readJSON(path.join(root,'runtime.local.json'),{});
 const data=path.resolve(process.env.KOKO_WECHAT_HOME||runtime.state_directory||path.join(os.homedir(),'.koko-wechat'));
 const marker=path.join(data,'service.json');
-const VERSION='0.7.3';
+const VERSION='0.7.4';
 function open(url){const child=spawn('rundll32.exe',['url.dll,FileProtocolHandler',url],{detached:true,stdio:'ignore',windowsHide:true});child.on('error',()=>{});child.unref();}
 async function ensure(){fs.mkdirSync(data,{recursive:true});let record=readJSON(marker,{}),health=await serviceHealth(record);if(!health){const log=fs.openSync(path.join(data,'service.log'),'a');const child=spawn(process.execPath,[fileURLToPath(import.meta.url),'--serve'],{detached:true,windowsHide:true,stdio:['ignore',log,log],cwd:root,env:{...process.env,KOKO_WECHAT_HOME:data}});child.unref();fs.closeSync(log);for(let i=0;i<100;i++){await new Promise(r=>setTimeout(r,150));record=readJSON(marker,{});health=await serviceHealth(record);if(health)break;}if(!health)throw Error('可可微信版没有启动，请查看service.log');}if(process.argv.includes('--open'))open(`http://127.0.0.1:${record.port}/#token=${record.token}`);process.stdout.write(JSON.stringify(startupReport(record,health,VERSION))+'\n');}
 async function serve(){
@@ -101,8 +101,10 @@ async function serve(){
       case 'pause': await controller.pause();return {enabled:false};
       case 'recovery-resume': {
         if(typeof params.chatId!=='string'||!bindingTargets(cfg).some(row=>row.chatId===params.chatId))throw Error('请选择当前已开启的会话');
-        if(pendingDelivery().items.some(row=>row.chatId===params.chatId))throw Error('此会话仍有待核对的发送记录，请先逐条核对');
-        controller.recovery.clear(cfg.accountId+':'+params.chatId);store.event('recovered','已继续接收后续新消息，不重发旧回复',{chatId:params.chatId});return {resumed:true,resent:false};
+        if(reconfiguring)throw Error('会话设置正在更新，请稍候');
+        const checkPending=()=>{if(pendingDelivery().items.some(row=>row.chatId===params.chatId))throw Error('此会话仍有待核对的发送记录，请先逐条核对');};
+        checkPending();reconfiguring=true;
+        try{return await controller.repairConnection(params.chatId,checkPending);}finally{reconfiguring=false;}
       }
       case 'review-send': {
         if(typeof params.id!=='string'||!params.id||params.id.length>300||typeof params.chatId!=='string')throw Error('请选择待核对记录');

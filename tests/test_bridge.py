@@ -20,6 +20,35 @@ sys.stdout, sys.stderr = stdout, stderr
 
 
 class BridgeTests(unittest.TestCase):
+    def test_explicit_rebind_resolves_current_process_instead_of_cached_window(self):
+        self.b._catalog={'small':{'id':'small','name':'小号','pid':10,'hwnd':20}}
+        fresh={'id':'small','name':'小号','pid':30,'hwnd':40}
+        self.b._detect=lambda:{'small':fresh}
+        self.assertIs(self.b._resolve_account('small'),fresh)
+
+    def test_missing_selected_account_never_falls_back_to_cached_or_other_login(self):
+        self.b._catalog={'small':{'id':'small','name':'小号','pid':10,'hwnd':20}}
+        self.b._detect=lambda:{'other':{'id':'other','name':'别的账号','pid':30,'hwnd':40}}
+        with self.assertRaises(bridge.BridgeError) as caught:self.b._resolve_account('small')
+        self.assertEqual(caught.exception.code,'SELECT_ACCOUNT')
+
+    def test_database_cache_follows_process_instance_but_not_window_size_or_handle(self):
+        created=[]
+        class DB:
+            def __init__(self,**kwargs):self.wxid='small';created.append(kwargs)
+            def get_self_info(self):return {'nick_name':'小号'}
+        dbmod=SimpleNamespace(WeChatDB=DB)
+        self.b._modules=lambda:(None,None,None,dbmod)
+        account={'id':'small','name':'小号','pid':10,'hwnd':20,'processStartedAt':1,'root':'test-root','account':'small_abcd'}
+        first=self.b._database(account)
+        self.assertIs(self.b._database({**account,'hwnd':21}),first)
+        second=self.b._database({**account,'pid':30,'processStartedAt':2})
+        self.assertIsNot(first,second)
+        self.assertEqual(dbmod._weixin_pids(),[30])
+        third=self.b._database({**account,'pid':30,'processStartedAt':3})
+        self.assertIsNot(second,third)
+        self.assertEqual(len(created),3)
+
     def test_main_window_choice_survives_z_order_and_minimized_login_shell(self):
         main={'id':'small','pid':10,'hwnd':20,'normalArea':790*591}
         login={'id':'small','pid':10,'hwnd':21,'normalArea':440*556}

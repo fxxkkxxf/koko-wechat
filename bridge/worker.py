@@ -213,6 +213,7 @@ class Bridge:
         self.state.mkdir(parents=True, exist_ok=True)
         self._catalog = {}
         self._dbs = {}
+        self._db_sources = {}
         self._account = None
         self._chat = None
         self._targets = {}
@@ -318,6 +319,7 @@ class Bridge:
                     if not gui.IsIconic(hwnd):
                         area = max(area, max(0, rect[2]-rect[0])*max(0, rect[3]-rect[1]))
                     windows.append({'id': account_id, 'account': folder, 'root': root, 'normalArea': area,
+                                    'processStartedAt': psutil.Process(pid).create_time(),
                                     'hwnd': hwnd, 'pid': pid, 'name': known_name})
             except Exception:
                 return
@@ -331,7 +333,8 @@ class Bridge:
         _, _, _, dbmod = self._modules()
         pid = account['pid']
         dbmod._weixin_pids = lambda: [pid]
-        if account_id in self._dbs:
+        source = tuple(account.get(key) for key in ('pid', 'processStartedAt', 'root', 'account'))
+        if account_id in self._dbs and self._db_sources.get(account_id) == source:
             return self._dbs[account_id]
         # Scope the library to the PID proven to hold this account's DB files.
         private = self.state / 'bridge-cache' / account_id
@@ -378,6 +381,7 @@ class Bridge:
             raise BridgeError('DATABASE_UNAVAILABLE', '无法读取已登录账号资料；请检查微信登录及桥接权限')
         account['name'] = info['nick_name']
         self._dbs[account_id] = db
+        self._db_sources[account_id] = source
         return db
 
     def accounts(self, **_):
@@ -399,10 +403,11 @@ class Bridge:
             return {'accounts': result}
 
     def _resolve_account(self, account_id):
-        if account_id in self._catalog:
-            return self._catalog[account_id]
-        self.accounts()
-        hits = [x for x in self._catalog.values() if account_id in (x['id'], x['name'])]
+        # A cached account name is not proof that its old process/window still
+        # exists. Every explicit bind/contact lookup resolves current PID-owned
+        # database files; sends remain pinned and never silently switch windows.
+        rows = self._detect()
+        hits = [x for x in rows.values() if account_id in (x['id'], x['name'])]
         if len(hits) != 1:
             raise BridgeError('SELECT_ACCOUNT', '请在管理页选择唯一的小号账号')
         return hits[0]

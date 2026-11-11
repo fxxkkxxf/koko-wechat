@@ -77,3 +77,43 @@ test('bridge RPC errors retain their typed error code',async()=>{
   let child;const spawn=()=>{child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();child.stdin=new Writable({write(chunk,encoding,done){const request=JSON.parse(chunk.toString());queueMicrotask(()=>child.stdout.write(JSON.stringify(request.method==='status'?{id:request.id,ok:true,result:{available:true}}:{id:request.id,ok:false,error:'上一条待核对',code:'NEEDS_REVIEW'})+'\n'));done();}});return child;};
   const client=new BridgeClient({root:process.cwd(),python:'mock',spawnImpl:spawn});await client.connect();await assert.rejects(client.call('send'),error=>error.code==='NEEDS_REVIEW');child.stdout.end();child.stderr.end();
 });
+
+function repairFixture(t,{enabled=true,doctor}={}){
+  const f=fixture(t),calls=[];f.store.data.settings.enabled=enabled;
+  f.chat.model.connect=async()=>{};f.chat.model.status=()=>({authenticated:true});
+  f.chat.bridge.call=async(method,args)=>{calls.push({method,args});if(method==='doctor')return doctor?doctor():{accountId:'small',available:true,controls:{ready:true,messagesSent:0,textInputsWritten:0}};return {};};
+  f.chat.recovery.hold({routeKey:'small:group',accountId:'small',chatId:'group',group:true},{kind:'attention',code:'ACCOUNT_CHANGED',reason:'旧窗口'});
+  return {...f,repairCalls:calls};
+}
+test('repair reconnects, verifies real controls, and restores listening without replaying queued messages',async t=>{
+  const f=repairFixture(t);f.chat.recovery.clear('small:group');f.receive('old-buffered');
+  f.chat.recovery.hold({routeKey:'small:group',accountId:'small',chatId:'group',group:true},{kind:'attention',code:'ACCOUNT_CHANGED'});
+  const selection=JSON.stringify(f.store.data.settings.groups),result=await f.chat.repairConnection('group');
+  assert.deepEqual(f.repairCalls.map(x=>x.method),['stop','bind','doctor','bind','start']);
+  assert(f.repairCalls.filter(x=>x.method==='bind').every(x=>x.args.accountId==='small'&&x.args.targets.some(y=>y.chatId==='group')));
+  assert.equal(result.reconnected,true);assert.equal(result.resent,false);assert.equal(f.store.data.settings.enabled,true);
+  assert.equal(f.chat.jobs.size,0);assert.equal(f.chat.recovery.get('small:group'),undefined);assert.equal(JSON.stringify(f.store.data.settings.groups),selection);
+});
+test('repair refuses unreadable controls or a different account and leaves the hold intact',async t=>{
+  for(const checked of [{accountId:'other',available:true,controls:{ready:true}},{accountId:'small',available:true,controls:{ready:false}}]){
+    const f=repairFixture(t,{doctor:()=>checked});await assert.rejects(f.chat.repairConnection('group'));
+    assert.equal(f.store.data.settings.enabled,false);assert(f.chat.recovery.get('small:group'));assert(!f.repairCalls.some(x=>x.method==='start'));
+  }
+});
+test('an explicit pause during reconnect wins over restoring the previous enabled state',async t=>{
+  let release;const waiting=new Promise(r=>release=r);const f=repairFixture(t,{doctor:()=>waiting});
+  const repairing=f.chat.repairConnection('group');while(!f.repairCalls.some(x=>x.method==='doctor'))await new Promise(r=>setImmediate(r));
+  await f.chat.pause();release({accountId:'small',available:true,controls:{ready:true}});await assert.rejects(repairing,/暂停状态/);
+  assert.equal(f.store.data.settings.enabled,false);assert(!f.repairCalls.some(x=>x.method==='start'));assert(f.chat.recovery.get('small:group'));
+});
+test('repair rechecks pending sends after stopping and does not acknowledge uncertainty',async t=>{
+  const f=repairFixture(t);await assert.rejects(f.chat.repairConnection('group',()=>{throw Error('仍需核对');}),/仍需核对/);
+  assert.deepEqual(f.repairCalls.map(x=>x.method),['stop','stop']);assert(f.chat.recovery.get('small:group'));
+});
+test('repair preserves a manual off and only releases same-account window-change holds',async t=>{
+  const f=repairFixture(t,{enabled:false});
+  for(const [accountId,chatId,kind,code] of [['small','friend','attention','ACCOUNT_CHANGED'],['small','conflict','attention','TARGET_MISMATCH'],['small','uncertain','review','ACCOUNT_CHANGED'],['other','friend','attention','ACCOUNT_CHANGED']])f.chat.recovery.hold({routeKey:accountId+':'+chatId,accountId,chatId},{kind,code});
+  const result=await f.chat.repairConnection('group');assert.equal(result.resumed,false);assert.equal(f.store.data.settings.enabled,false);
+  assert(!f.repairCalls.some(x=>x.method==='start'));assert.equal(f.chat.recovery.get('small:friend'),undefined);
+  for(const key of ['small:conflict','small:uncertain','other:friend'])assert(f.chat.recovery.get(key));
+});
